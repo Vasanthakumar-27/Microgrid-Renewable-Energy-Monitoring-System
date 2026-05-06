@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - MicroGrid Pro</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #070b14;
+      --text-main: #ffffff;
+      --text-muted: #94a3b8;
+      
+      --c-blue: #3b82f6;
+      --c-green: #10b981;
+      --c-orange: #f59e0b;
+      --c-purple: #8b5cf6;
+      --c-gold: #fbbf24;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      background: linear-gradient(135deg, #050810 0%, #0a192f 100%);
+      color: var(--text-main);
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Subtle background circuit/grid effect */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
+      background-image: 
+        radial-gradient(circle at 75% 50%, rgba(16, 185, 129, 0.05), transparent 50%),
+        radial-gradient(circle at 25% 30%, rgba(59, 130, 246, 0.08), transparent 40%),
+        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 50px 50px, 50px 50px;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .container {
+      display: flex;
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      z-index: 1;
+    }
+
+    /* --- Left Section --- */
+    .left-section {
+      flex: 1;
+      padding: 5rem 3rem 4rem 2rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      animation: fadeIn 1s ease-out;
+    }
+
+    .branding h1 {
+      font-size: 2.8rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+
+    .branding p {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      margin-bottom: 3rem;
+      font-weight: 400;
+    }
+
+    .features {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .feature-card {
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      position: relative;
+      cursor: default;
+    }
+
+    .feature-card:hover {
+      transform: translateX(8px);
+    }
+
+    .feature-card h3 { font-size: 1.05rem; margin-bottom: 0.2rem; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+    .feature-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; }
+
+    .feature-icon {
+      font-size: 1.8rem;
+      min-width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.03);
+    }
+
+    /* Card Glowing Themes */
+    .card-blue { border: 1px solid rgba(59, 130, 246, 0.3); box-shadow: inset 0 0 15px rgba(59, 130, 246, 0.1); }
+    .card-blue:hover { box-shadow: inset 0 0 20px rgba(59, 130, 246, 0.2), 0 4px 15px rgba(59,130,246,0.1); }
+    .card-blue .feature-icon { color: var(--c-blue); text-shadow: 0 0 8px var(--c-blue); }
+
+    .card-green { border: 1px solid rgba(16, 185, 129, 0.3); box-shadow: inset 0 0 15px rgba(16, 185, 129, 0.1); }
+    .card-green:hover { box-shadow: inset 0 0 20px rgba(16, 185, 129, 0.2), 0 4px 15px rgba(16, 185, 129, 0.1); }
+    .card-green .feature-icon { color: var(--c-green); text-shadow: 0 0 8px var(--c-green); }
+
+    .card-orange { border: 1px solid rgba(245, 158, 11, 0.3); box-shadow: inset 0 0 15px rgba(245, 158, 11, 0.1); }
+    .card-orange:hover { box-shadow: inset 0 0 20px rgba(245, 158, 11, 0.2), 0 4px 15px rgba(245, 158, 11, 0.1); }
+    .card-orange .feature-icon { color: var(--c-orange); text-shadow: 0 0 8px var(--c-orange); }
+
+    .card-purple { border: 1px solid rgba(139, 92, 246, 0.3); box-shadow: inset 0 0 15px rgba(139, 92, 246, 0.1); }
+    .card-purple:hover { box-shadow: inset 0 0 20px rgba(139, 92, 246, 0.2), 0 4px 15px rgba(139, 92, 246, 0.1); }
+    .card-purple .feature-icon { color: var(--c-purple); text-shadow: 0 0 8px var(--c-purple); }
+
+
+    /* --- Right Section --- */
+    .right-section {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      animation: fadeIn 1s ease-out 0.2s both; /* Slight delay */
+    }
+
+    .login-panel {
+      width: 100%;
+      max-width: 400px;
+      /* Strong Glassmorphism Blur */
+      background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.4) 100%);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      padding: 3rem 2.5rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+      position: relative;
+    }
+
+    /* Glow effect behind panel */
+    .login-panel::before {
+      content: '';
+      position: absolute;
+      top: -2px; right: -2px; bottom: -2px; left: -2px;
+      z-index: -1;
+      background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.2), transparent 50%),
+                  radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.1), transparent 50%);
+      filter: blur(20px);
+      border-radius: 24px;
+      pointer-events: none;
+    }
+
+    .logo-circle {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 1.5rem;
+      background: linear-gradient(135deg, #fcd34d 0%, #b45309 100%);
+      border-radius: 25%;
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.4), inset 0 0 10px rgba(255,255,255,0.5);
+      position: relative;
+    }
+    
+    .logo-circle::after {
+      content: '';
+      position: absolute;
+      top: -8px; left: -8px; right: -8px; bottom: -8px;
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      border-radius: 32%;
+    }
+
+    .login-panel h2 {
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.3rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .login-panel p.sub {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .form-group input {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 0.9rem 1.25rem;
+      color: white;
+      font-size: 0.95rem;
+      transition: all 0.3s ease;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: rgba(59, 130, 246, 0.6);
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.3), inset 0 0 10px rgba(59, 130, 246, 0.1);
+      background: rgba(0, 0, 0, 0.35);
+    }
+
+    .btn-login {
+      width: 100%;
+      padding: 1rem;
+      margin-top: 1rem;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(90deg, #3264ab, #915ea3, #b67623);
+      color: white;
+      font-weight: 600;
+      font-size: 1rem;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    .btn-login:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(182, 118, 35, 0.4);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 900px) {
+      body { flex-direction: column; overflow-y: auto; }
+      .container { flex-direction: column; }
+      .left-section { padding: 3rem 2rem; align-items: center; text-align: center; }
+      .left-section h1, .left-section p { text-align: center; }
+      .feature-card { text-align: left; }
+      .right-section { padding: 1rem 2rem 4rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- Left Section: Features Panel -->
+    <div class="left-section">
+      <div class="branding">
+        <h1>MicroGrid Pro</h1>
+        <p>Smart Hybrid Microgrid Platform</p>
+      </div>
+
+      <div class="features">
+        <div class="feature-card card-blue">
+          <div class="feature-icon">📈</div>
+          <div>
+            <h3>Real-time Monitoring</h3>
+            <p>Monitor solar and wind generation with live dashboards and instant alerts.</p>
+          </div>
+        </div>
+
+        <div class="feature-card card-green">
+          <div class="feature-icon">🔋</div>
+          <div>
+            <h3>Battery Management</h3>
+            <p>Optimize energy storage with intelligent battery status tracking and forecasting.</p>
+          </div>
+        </div>
+
+        <div class="feature-card card-orange">
+          <div class="feature-icon">📊</div>
+          <div>
+            <h3>Advanced Analytics</h3>
+            <p>Analyze generation trends, consumption patterns, and performance metrics.</p>
+          </div>
+        </div>
+
+        <div class="feature-card card-purple">
+          <div class="feature-icon">🪙</div>
+          <div>
+            <h3>Savings Tracking</h3>
+            <p>Track financial benefits and calculate savings from renewable energy generation.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Section: Login Panel -->
+    <div class="right-section">
+      <div class="login-panel">
+        <div class="logo-circle"></div>
+        <h2>Welcome Back</h2>
+        <p class="sub">Access your microgrid dashboard</p>
+
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="username" placeholder="admin">
+        </div>
+
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="password" placeholder="••••••••">
+        </div>
+
+        <button class="btn-login" onclick="login()">SIGN IN</button>
+
+        <div style="margin-top: 2rem; font-size: 0.85rem; color: var(--text-muted); text-align: center;">
+          <p style="margin-bottom: 0.75rem; font-weight: 600; color: rgba(255,255,255,0.7); text-transform: uppercase;">One-Click Demo Accounts</p>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: start; max-width: 200px; margin: 0 auto; text-align: left;">
+            <span style="cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--c-blue)'" onmouseout="this.style.color='var(--text-muted)'" onclick="document.getElementById('username').value='company'; document.getElementById('password').value='company123'; login();">🏢 <b>Admin:</b> company</span>
+            <span style="cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--c-green)'" onmouseout="this.style.color='var(--text-muted)'" onclick="document.getElementById('username').value='operator'; document.getElementById('password').value='operator123'; login();">🛠️ <b>Operator:</b> operator</span>
+            <span style="cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--c-purple)'" onmouseout="this.style.color='var(--text-muted)'" onclick="document.getElementById('username').value='customer'; document.getElementById('password').value='customer123'; login();">🏠 <b>Customer:</b> customer</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Auto Redirect protection
+    const token = localStorage.getItem("token");
+    const role = localStorage.getItem("role");
+    if (token && role === "admin") {
+      window.location.href = "/dashboard/admin.html";
+    } else if (token && role === "operator") {
+      window.location.href = "/dashboard/operator.html";
+    } else if (token && role === "customer") {
+      window.location.href = "/dashboard/customer.html";
+    }
+
+    async function login() {
+      const u = document.querySelector("#username").value;
+      const p = document.querySelector("#password").value;
+
+      try {
+        const response = await fetch("http://localhost:5000/auth/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ username: u, password: p }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data.message || "Invalid credentials. Please try again.");
+          return;
+        }
+
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("role", data.role);
+        if (data.customerId) {
+          localStorage.setItem("customerId", data.customerId);
+        } else {
+          localStorage.removeItem("customerId");
+        }
+
+        window.location.href = data.dashboardPath || "/dashboard/index.html";
+      } catch (error) {
+        alert("Login failed. Please check backend server status.");
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operator Dashboard - Renewable Energy Monitoring</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="dashboard-view">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">M</div>
+        <div class="sidebar-title">Microgrid Pro</div>
+      </div>
+
+      <ul class="nav-links">
+        <li class="nav-item"><a href="#" class="nav-link active" data-view="dashboard">Dashboard</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-view="customers">Customers</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-view="alerts">Alerts</a></li>
+      </ul>
+
+      <div class="user-profile">
+        <div class="user-avatar">O</div>
+        <div class="user-info">
+          <h4>Operator User</h4>
+          <p>Field Operator</p>
+        </div>
+        <button onclick="logout()" style="margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem;" title="Logout">Logout</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h2 id="operatorHeaderTitle">Operator View</h2>
+        </div>
+        <div class="topbar-right">
+          <div class="system-status">
+            <span class="status-dot"></span>
+            System Online
+          </div>
+        </div>
+      </header>
+
+      <section id="dashboardView" class="dashboard-scroll operator-view">
+        <div class="kpi-grid">
+          <div class="kpi-card blue">
+            <div class="kpi-header"><span>Assigned Grids</span></div>
+            <div class="kpi-value" id="kpiAssignedGrids">--</div>
+          </div>
+
+          <div class="kpi-card green">
+            <div class="kpi-header"><span>Avg Battery Status</span></div>
+            <div class="kpi-value" id="kpiAvgBattery">--</div>
+          </div>
+
+          <div class="kpi-card red" id="alertsKpiCard">
+            <div class="kpi-header"><span>Active Alerts</span></div>
+            <div class="kpi-value" id="kpiAlerts">0</div>
+          </div>
+        </div>
+
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-header">Production vs Usage</div>
+            <div class="chart-container"><canvas id="energyChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">System Battery Levels</div>
+            <div class="chart-container"><canvas id="batteryChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="chart-card" style="margin-bottom: 1.5rem;">
+          <div class="table-header table-header-row">
+            <span>Energy Comparison (Day / Month / Year)</span>
+            <div style="display:flex; gap:0.6rem; align-items:center;">
+              <select id="operatorComparisonType">
+                <option value="day">Day</option>
+                <option value="month">Month</option>
+                <option value="year">Year</option>
+              </select>
+              <button id="operatorComparisonRefreshBtn" class="ghost-btn">Load</button>
+            </div>
+          </div>
+          <div class="chart-container"><canvas id="operatorComparisonChart"></canvas></div>
+        </div>
+
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-header">Alert Severity</div>
+            <div class="chart-container"><canvas id="severityChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="bottom-grid">
+          <div class="table-card" style="grid-column: 1 / 2;">
+            <div class="table-header">Assigned Microgrids</div>
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Grid ID</th>
+                    <th>Battery</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="microgridTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="table-card alerts-panel">
+            <div class="table-header">Assigned Alerts</div>
+            <ul class="alerts-list" id="alertsList"></ul>
+          </div>
+
+          <div class="table-card alerts-panel" style="grid-column: 1 / -1;">
+            <div class="table-header">System Insight Panel</div>
+            <ul class="alerts-list" id="operatorInsightsList"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="customersView" class="dashboard-scroll operator-view hidden">
+        <div class="bottom-grid" style="grid-template-columns: 1fr 1.4fr;">
+          <div class="table-card">
+            <div class="table-header">Add Customer</div>
+            <form id="customerCreateForm" class="stack-form">
+              <label>Name</label>
+              <input id="customerName" type="text" required>
+
+              <label>Password</label>
+              <input id="customerPassword" type="text" required>
+
+              <label>Phone</label>
+              <input id="customerPhone" type="text" required>
+
+              <label>Location</label>
+              <input id="customerLocation" type="text" required>
+
+              <button type="submit" class="primary-btn">Add Customer</button>
+            </form>
+          </div>
+
+          <div class="table-card">
+            <div class="table-header">Customer Ledger</div>
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Location</th>
+                    <th>Grid</th>
+                    <th>Usage (kWh)</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="operatorCustomerTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-card" style="margin-top: 1.5rem;">
+          <div class="table-header table-header-row">
+            <span>Customer Bill History</span>
+            <div style="display:flex; gap:0.6rem; align-items:center;">
+              <select id="operatorHistoryCustomerSelect"></select>
+              <button id="operatorHistoryLoadBtn" class="ghost-btn">Load History</button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Usage</th>
+                  <th>Amount</th>
+                  <th>Paid</th>
+                  <th>Remaining</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="operatorHistoryTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="alertsView" class="dashboard-scroll operator-view hidden">
+        <div class="table-card">
+          <div class="table-header table-header-row">
+            <span>Assigned Grid Alerts</span>
+            <button id="refreshOperatorAlertsBtn" class="ghost-btn">Refresh</button>
+          </div>
+          <ul class="alerts-list" id="operatorAlertsModuleList"></ul>
+        </div>
+
+        <div class="table-card" style="margin-top:1.2rem;">
+          <div class="table-header">Resolved Alert History</div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Grid</th>
+                  <th>Severity</th>
+                  <th>Status</th>
+                  <th>Resolved At</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody id="operatorResolvedAlertsBody">
+                <tr><td colspan="6" class="no-alerts">No resolved alerts</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="operator.js"></script>
+</body>
+</html>

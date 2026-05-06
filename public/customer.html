@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Dashboard - Renewable Energy Monitoring</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .billing-card {
+      background: linear-gradient(135deg, rgba(30,33,40,0.8), rgba(15,17,21,0.9));
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+    .billing-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 150px;
+      height: 150px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.2), transparent 70%);
+      border-radius: 50%;
+      transform: translate(50%, -50%);
+    }
+    .billing-details { margin-top: 1.5rem; }
+    .bill-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+    .bill-row.total {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border-color);
+      color: var(--text-primary);
+      font-weight: 700;
+      font-size: 1.2rem;
+    }
+    .btn-pay {
+      width: 100%;
+      margin-top: 1.5rem;
+      padding: 0.9rem;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-primary));
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition-speed);
+      box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+    }
+    .btn-pay:hover {
+      box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+      transform: translateY(-2px);
+    }
+    .reminder-banner {
+      margin-bottom: 1rem;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      background: rgba(245, 158, 11, 0.08);
+      color: #fcd34d;
+      padding: 0.85rem 1rem;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-view">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">M</div>
+        <div class="sidebar-title">Microgrid Pro</div>
+      </div>
+
+      <ul class="nav-links">
+        <li class="nav-item"><a href="#" class="nav-link active" data-view="energy">My Energy</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-view="billing">Billing</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-view="history">Payment History</a></li>
+      </ul>
+
+      <div class="user-profile">
+        <div class="user-avatar">C</div>
+        <div class="user-info">
+          <h4>Home Owner</h4>
+          <p>Customer</p>
+        </div>
+        <button onclick="logout()" style="margin-left:auto; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem;" title="Logout">Logout</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h2 id="customerHeaderTitle">Customer Portal</h2>
+        </div>
+        <div class="topbar-right">
+          <div class="system-status">
+            <span class="status-dot"></span>
+            Connected
+          </div>
+        </div>
+      </header>
+
+      <section id="energyView" class="dashboard-scroll customer-view">
+        <div id="reminderBanner" class="reminder-banner hidden"></div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card blue">
+            <div class="kpi-header"><span>Current Usage (kWh)</span></div>
+            <div class="kpi-value" id="kpiCurrentUsage">--</div>
+          </div>
+
+          <div class="kpi-card green">
+            <div class="kpi-header"><span>Savings (INR)</span></div>
+            <div class="kpi-value" id="kpiSavings">--</div>
+          </div>
+
+          <div class="kpi-card yellow">
+            <div class="kpi-header"><span>Est. Monthly Bill</span></div>
+            <div class="kpi-value" id="kpiEstBill">--</div>
+          </div>
+        </div>
+
+        <div class="chart-card" style="margin-bottom:1.5rem;">
+          <div class="table-header table-header-row">
+            <span>Energy Comparison (Generation vs Consumption)</span>
+            <div style="display:flex; gap:0.6rem; align-items:center;">
+              <select id="customerComparisonType">
+                <option value="day">Day</option>
+                <option value="month" selected>Month</option>
+                <option value="year">Year</option>
+              </select>
+              <button id="customerComparisonLoadBtn" class="ghost-btn">Load</button>
+            </div>
+          </div>
+          <div class="chart-container"><canvas id="customerComparisonChart"></canvas></div>
+        </div>
+
+        <div class="bottom-grid">
+          <div class="chart-card" style="grid-column: 1 / 2;">
+            <div class="chart-header">Monthly Energy Usage</div>
+            <div class="chart-container"><canvas id="usageChart"></canvas></div>
+          </div>
+
+          <div class="table-card billing-card" id="billingSection">
+            <div class="table-header" style="position: relative; z-index: 2;">Your Billing Account</div>
+            <div class="billing-details" style="position: relative; z-index: 2;">
+              <div class="bill-row">
+                <span>Usage This Period</span>
+                <span id="billUsage">-- kWh</span>
+              </div>
+              <div class="bill-row">
+                <span>Usage Rate</span>
+                <span id="billRate">INR -- / kWh</span>
+              </div>
+              <div class="bill-row">
+                <span>Fixed Charge</span>
+                <span id="billFixed">INR --</span>
+              </div>
+              <div class="bill-row total">
+                <span>Total Due</span>
+                <span id="billTotal">INR 0.00</span>
+              </div>
+              <button class="btn-pay" id="payBtn">Pay Now</button>
+            </div>
+          </div>
+
+          <div class="chart-card" style="grid-column: 1 / 2;">
+            <div class="chart-header">Cost Breakdown</div>
+            <div class="chart-container"><canvas id="costChart"></canvas></div>
+          </div>
+
+          <div class="chart-card" style="grid-column: 2 / 3;">
+            <div class="chart-header">Savings Over Time</div>
+            <div class="chart-container"><canvas id="savingsChart"></canvas></div>
+          </div>
+
+          <div class="chart-card" style="grid-column: 1 / -1;">
+            <div class="chart-header">Usage vs Monthly Limit</div>
+            <div class="chart-container" style="height: 220px;"><canvas id="usageLimitChart"></canvas></div>
+            <p id="savingsMessage" style="margin-top: 12px; color: var(--accent-success); font-weight: 600;">You saved INR 0 this month</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="billingView" class="dashboard-scroll customer-view hidden">
+        <div class="table-card billing-card" id="currentBillCard">
+          <div class="table-header" style="position: relative; z-index: 2;">Current Month Bill</div>
+          <div class="billing-details" style="position: relative; z-index: 2;">
+            <div class="bill-row">
+              <span>Month</span>
+              <span id="billMonth">-- </span>
+            </div>
+            <div class="bill-row">
+              <span>Energy Usage</span>
+              <span id="billUnitsUsed">-- kWh</span>
+            </div>
+            <div class="bill-row">
+              <span>Current Rate</span>
+                <span id="billCurrentRate">INR -- / kWh</span>
+            </div>
+            <div class="bill-row total">
+              <span>Total Due</span>
+                <span id="billTotalDue">INR 0.00</span>
+            </div>
+            <div class="bill-row" id="billStatusRow" style="margin-top: 0.75rem; color: #10b981; font-weight: 600;">
+              <span>Status</span>
+              <span id="billStatus">Pending</span>
+            </div>
+            <button class="btn-pay" id="payNowBtn">Pay Now</button>
+          </div>
+        </div>
+
+        <div class="table-card" style="margin-top:1.5rem;">
+          <div class="table-header">Previous Month Bills</div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Usage (kWh)</th>
+                  <th>Amount (INR)</th>
+                  <th>Paid (INR)</th>
+                  <th>Remaining (INR)</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="billHistoryBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="historyView" class="dashboard-scroll customer-view hidden">
+        <div class="table-card" style="margin-bottom:1.2rem;">
+          <div class="table-header table-header-row">
+            <span>Payment History</span>
+            <button id="refreshHistoryBtn" class="ghost-btn">Refresh</button>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Month</th>
+                  <th>Amount</th>
+                  <th>Method</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="paymentHistoryBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-card alerts-panel">
+          <div class="table-header">Insights</div>
+          <ul class="alerts-list" id="customerInsightsList"></ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="customer.js"></script>
+</body>
+</html>
