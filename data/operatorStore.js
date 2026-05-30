@@ -1,4 +1,5 @@
 const Operator = require("../models/operatorModel");
+const crypto = require("crypto");
 const { operators: seedOperators, microgrids } = require("./energyData");
 
 function toOperatorPayload(doc) {
@@ -25,10 +26,74 @@ function buildAssignedMicrogrids(gridCount) {
     .map((grid) => String(grid.id));
 }
 
+function normalizeAssignedMicrogrids(input = []) {
+  const allowed = new Set(microgrids.map((grid) => String(grid.id)));
+  const normalized = [];
+
+  input.forEach((entry) => {
+    if (entry === null || entry === undefined) {
+      return;
+    }
+    const raw = String(entry).trim();
+    if (!raw) {
+      return;
+    }
+
+    if (allowed.has(raw)) {
+      normalized.push(raw);
+      return;
+    }
+
+    const number = Number(String(raw).replace(/\D/g, ""));
+    if (Number.isFinite(number) && number > 0) {
+      const candidate = `mg-${number}`;
+      if (allowed.has(candidate)) {
+        normalized.push(candidate);
+      }
+    }
+  });
+
+  return Array.from(new Set(normalized));
+}
+
 function toGridNumbers(assignedMicrogrids = []) {
   return assignedMicrogrids
     .map((entry) => Number(String(entry).replace(/\D/g, "")))
     .filter((value) => Number.isFinite(value) && value > 0);
+}
+
+const HASH_PREFIX = "pbkdf2$";
+
+function hashPassword(rawPassword) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto
+    .pbkdf2Sync(String(rawPassword), salt, 100000, 64, "sha512")
+    .toString("hex");
+  return `${HASH_PREFIX}${salt}$${hash}`;
+}
+
+function verifyPassword(rawPassword, stored) {
+  if (!stored || !rawPassword) {
+    return { ok: false, needsUpgrade: false };
+  }
+
+  if (!String(stored).startsWith(HASH_PREFIX)) {
+    return {
+      ok: String(rawPassword) === String(stored),
+      needsUpgrade: true,
+    };
+  }
+
+  const parts = String(stored).slice(HASH_PREFIX.length).split("$");
+  if (parts.length !== 2) {
+    return { ok: false, needsUpgrade: false };
+  }
+
+  const [salt, storedHash] = parts;
+  const hash = crypto
+    .pbkdf2Sync(String(rawPassword), salt, 100000, 64, "sha512")
+    .toString("hex");
+  return { ok: hash === storedHash, needsUpgrade: false };
 }
 
 async function ensureSeedOperators() {
@@ -47,7 +112,7 @@ async function ensureSeedOperators() {
       id: entry.id,
       name: entry.name,
       username: entry.username || entry.name,
-      password: entry.password,
+      password: hashPassword(entry.password),
       gridCount,
       location: entry.location || "Unassigned",
       assignedMicrogrids: Array.isArray(entry.assignedMicrogrids)
@@ -85,10 +150,26 @@ async function getOperatorByLogin(username, password) {
   await ensureSeedOperators();
 
   const normalized = String(username || "").trim().toLowerCase();
-  const rows = await Operator.find({ password: String(password || "") }).lean();
+  const rows = await Operator.find({}).lean();
   const match = rows.find((entry) =>
     String(entry.username || entry.name || "").trim().toLowerCase() === normalized
   );
+
+  if (!match) {
+    return null;
+  }
+
+  const verification = verifyPassword(password, match.password);
+  if (!verification.ok) {
+    return null;
+  }
+
+  if (verification.needsUpgrade) {
+    await Operator.updateOne(
+      { id: String(match.id) },
+      { $set: { password: hashPassword(password) } }
+    );
+  }
 
   return toOperatorPayload(match || null);
 }
@@ -115,7 +196,7 @@ async function createOperator(payload) {
     id,
     name,
     username: slug || `operator-${Date.now()}`,
-    password,
+    password: hashPassword(password),
     gridCount,
     location,
     assignedMicrogrids: buildAssignedMicrogrids(gridCount),
@@ -142,14 +223,23 @@ async function updateOperator(id, payload) {
       : Number(existing.gridCount || 0),
   };
 
-  const assignedMicrogrids = buildAssignedMicrogrids(next.gridCount);
+  let assignedMicrogrids = existing.assignedMicrogrids || [];
+  if (payload?.assignedMicrogrids !== undefined) {
+    assignedMicrogrids = normalizeAssignedMicrogrids(payload.assignedMicrogrids);
+    next.gridCount = assignedMicrogrids.length;
+  } else if (payload?.gridCount !== undefined) {
+    assignedMicrogrids = buildAssignedMicrogrids(next.gridCount);
+  }
 
   const updated = await Operator.findOneAndUpdate(
     { id: String(id) },
     {
       $set: {
         name: next.name || existing.name,
-        password: next.password || existing.password,
+        password:
+          payload?.password !== undefined && next.password
+            ? hashPassword(next.password)
+            : existing.password,
         location: next.location || "Unassigned",
         gridCount: next.gridCount,
         assignedMicrogrids,
@@ -187,4 +277,5 @@ module.exports = {
   deleteOperator,
   addCustomerToOperator,
   toGridNumbers,
+  normalizeAssignedMicrogrids,
 };

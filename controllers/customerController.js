@@ -10,6 +10,26 @@ const {
   getPaymentHistory,
 } = require("../data/billingStore");
 const { roundToTwo } = require("../data/globalRules");
+const { logAudit } = require("../data/auditLogStore");
+const {
+  createNotification,
+  listNotifications,
+  markNotificationRead,
+} = require("../data/notificationStore");
+
+function isValidPhone(value) {
+  if (!value) {
+    return false;
+  }
+  return /^\d{10,15}$/.test(String(value).trim());
+}
+
+function isValidEmail(value) {
+  if (!value) {
+    return false;
+  }
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim());
+}
 
 const getMonthKeyFromQuery = (value) => validateMonthKey(value);
 
@@ -117,6 +137,61 @@ const getCustomerById = (req, res) => {
   return res.status(200).json(customer);
 };
 
+const updateCustomerProfile = (req, res) => {
+  const { id } = req.params;
+  const customer = customers.find((entry) => entry.id === id);
+
+  if (!customer) {
+    return res.status(404).json({ message: "Customer not found" });
+  }
+
+  if (req.body?.name !== undefined) {
+    const nextName = String(req.body.name).trim();
+    if (nextName) {
+      customer.name = nextName;
+    }
+  }
+
+  if (req.body?.phone !== undefined) {
+    const nextPhone = String(req.body.phone).trim();
+    if (nextPhone) {
+      if (!isValidPhone(nextPhone)) {
+        return res.status(400).json({ message: "phone must be 10-15 digits" });
+      }
+      customer.phone = nextPhone;
+    }
+  }
+
+  if (req.body?.email !== undefined) {
+    const nextEmail = String(req.body.email).trim();
+    if (nextEmail) {
+      if (!isValidEmail(nextEmail)) {
+        return res.status(400).json({ message: "email is invalid" });
+      }
+      customer.email = nextEmail;
+    }
+  }
+
+  if (req.body?.location !== undefined) {
+    const nextLocation = String(req.body.location).trim();
+    if (nextLocation) {
+      customer.location = nextLocation;
+    }
+  }
+
+  if (req.body?.password !== undefined) {
+    const nextPassword = String(req.body.password).trim();
+    if (nextPassword) {
+      customer.password = nextPassword;
+    }
+  }
+
+  return res.status(200).json({
+    message: "Profile updated",
+    customer,
+  });
+};
+
 const getCustomerUsage = (req, res) => {
   const { id } = req.params;
   const customer = customers.find((entry) => entry.id === id);
@@ -160,6 +235,8 @@ const getCustomerBill = async (req, res) => {
 const getCustomerBillHistory = async (req, res) => {
   const { id } = req.params;
   const yearFilter = req.query.year ? Number(req.query.year) : null;
+  const limit = req.query.limit ? Number(req.query.limit) : null;
+  const page = req.query.page ? Number(req.query.page) : null;
   const customer = customers.find((entry) => entry.id === id);
 
   if (!customer) {
@@ -169,12 +246,18 @@ const getCustomerBillHistory = async (req, res) => {
   const currentMonth = currentMonthKey();
   await ensureMonthlyBill(customer, currentMonth);
 
-  const history = await getBillHistory(customer, { year: yearFilter });
+  const history = await getBillHistory(customer, {
+    year: yearFilter,
+    limit,
+    page,
+  });
 
   return res.status(200).json({
     customerId: customer.id,
     customerName: customer.name,
     year: yearFilter,
+    page: page || 1,
+    limit: limit || null,
     history,
     bills: history,
   });
@@ -182,18 +265,22 @@ const getCustomerBillHistory = async (req, res) => {
 
 const getCustomerPaymentHistory = async (req, res) => {
   const { id } = req.params;
+  const limit = req.query.limit ? Number(req.query.limit) : null;
+  const page = req.query.page ? Number(req.query.page) : null;
   const customer = customers.find((entry) => entry.id === id);
 
   if (!customer) {
     return res.status(404).json({ message: "Customer not found" });
   }
 
-  const payments = await getPaymentHistory(customer.id);
+  const payments = await getPaymentHistory(customer.id, { limit, page });
 
   return res.status(200).json({
     customerId: customer.id,
     customerName: customer.name,
     currency: CURRENCY,
+    page: page || 1,
+    limit: limit || null,
     payments,
   });
 };
@@ -280,17 +367,49 @@ const makeCustomerPayment = async (req, res) => {
     return res.status(404).json({ message: "Customer not found" });
   }
 
-  const payment = await applyPayment(customer, monthKey, amount, req.body.method || "ONLINE");
+  let payment;
+  try {
+    payment = await applyPayment(customer, monthKey, amount, req.body.method || "ONLINE");
+  } catch (error) {
+    return res.status(400).json({ message: error.message || "Payment failed" });
+  }
   const monthlyBill = payment.bill;
   const appliedAmount = payment.appliedAmount;
   const paymentRecord = payment.paymentRecord;
+
+  const capped = Number(appliedAmount) < Number(amount);
+
+  await logAudit({
+    actorRole: req.user?.role || "customer",
+    actorId: customer.id,
+    action: "PAYMENT_MADE",
+    targetType: "bill",
+    targetId: `${customer.id}:${monthKey}`,
+    metadata: {
+      requestedAmount: amount,
+      appliedAmount,
+      method: paymentRecord.method,
+      currency: CURRENCY,
+      capped,
+    },
+  });
+
+  await createNotification({
+    userId: customer.id,
+    role: "customer",
+    title: "Payment received",
+    message: `Payment of INR ${appliedAmount.toFixed(2)} applied for ${monthKey}.`,
+    type: capped ? "WARNING" : "SUCCESS",
+  });
 
   return res.status(200).json({
     message: "Payment processed",
     customerId: customer.id,
     month: monthKey,
     currency: CURRENCY,
+    requestedAmount: amount,
     appliedAmount,
+    capped,
     remainingBillAmount: monthlyBill.remainingAmount,
     paymentStatus: monthlyBill.paymentStatus,
     paymentRecord,
@@ -326,15 +445,52 @@ const getCustomerReminders = async (req, res) => {
   });
 };
 
+const getCustomerNotifications = async (req, res) => {
+  const { id } = req.params;
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 50));
+  const page = Math.max(1, Number(req.query.page) || 1);
+
+  const customer = customers.find((entry) => entry.id === id);
+  if (!customer) {
+    return res.status(404).json({ message: "Customer not found" });
+  }
+
+  const rows = await listNotifications(customer.id, { limit, page });
+  return res.status(200).json({
+    customerId: customer.id,
+    page,
+    limit,
+    notifications: rows,
+  });
+};
+
+const markCustomerNotificationRead = async (req, res) => {
+  const { id, notificationId } = req.params;
+  const customer = customers.find((entry) => entry.id === id);
+  if (!customer) {
+    return res.status(404).json({ message: "Customer not found" });
+  }
+
+  const updated = await markNotificationRead(customer.id, notificationId);
+  if (!updated) {
+    return res.status(404).json({ message: "Notification not found" });
+  }
+
+  return res.status(200).json({ message: "Notification marked as read" });
+};
+
 module.exports = {
   getCustomerEnergyComparison,
   getCustomerBillSummary,
   getCustomerById,
+  updateCustomerProfile,
   getCustomerUsage,
   getCustomerBill,
   getCustomerBillHistory,
   getCustomerBillComparison,
   getCustomerPaymentHistory,
   getCustomerReminders,
+  getCustomerNotifications,
+  markCustomerNotificationRead,
   makeCustomerPayment,
 };

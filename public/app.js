@@ -68,7 +68,10 @@ const views = {
 const headerTitle = document.getElementById("headerTitle");
 const navLinks = Array.from(document.querySelectorAll(".nav-link[data-view]"));
 const adminOperatorFilter = document.getElementById("adminOperatorFilter");
+const adminOperatorBadge = document.getElementById("adminOperatorBadge");
+const clearOperatorFilterBtn = document.getElementById("clearOperatorFilterBtn");
 let selectedOperatorId = "all";
+let adminOperatorsCache = [];
 
 function withOperatorFilter(url) {
   if (!selectedOperatorId || selectedOperatorId === "all") {
@@ -83,6 +86,7 @@ async function loadAdminOperatorFilterOptions() {
   try {
     const response = await authFetch(`${API_BASE}/company/operators`);
     const operators = await response.json();
+    adminOperatorsCache = operators;
 
     adminOperatorFilter.innerHTML = '<option value="all">All Operators</option>';
     operators.forEach((operator) => {
@@ -97,13 +101,40 @@ async function loadAdminOperatorFilterOptions() {
       selectedOperatorId = "all";
     }
     adminOperatorFilter.value = selectedOperatorId;
+    updateAdminOperatorBadge();
   } catch (error) {
     console.error("Failed to load operator filter options:", error);
   }
 }
 
+function updateAdminOperatorBadge() {
+  if (!adminOperatorBadge) {
+    return;
+  }
+
+  if (!selectedOperatorId || selectedOperatorId === "all") {
+    adminOperatorBadge.textContent = "Viewing: All Operators";
+    return;
+  }
+
+  const match = adminOperatorsCache.find((operator) => operator.id === selectedOperatorId);
+  adminOperatorBadge.textContent = `Viewing: ${match ? match.name : selectedOperatorId}`;
+}
+
 adminOperatorFilter.addEventListener("change", async () => {
   selectedOperatorId = adminOperatorFilter.value || "all";
+  updateAdminOperatorBadge();
+  await fetchDashboardData();
+
+  if (!views.alerts.classList.contains("hidden")) {
+    await loadAlertsModule();
+  }
+});
+
+clearOperatorFilterBtn.addEventListener("click", async () => {
+  selectedOperatorId = "all";
+  adminOperatorFilter.value = "all";
+  updateAdminOperatorBadge();
   await fetchDashboardData();
 
   if (!views.alerts.classList.contains("hidden")) {
@@ -134,6 +165,9 @@ function switchAdminView(view) {
     loadAlertsModule();
   } else if (view === "billing") {
     loadBillingOverview();
+    loadDisputes();
+    loadMaintenanceTickets();
+    loadAuditLogs();
   }
 }
 
@@ -449,6 +483,16 @@ function updateCharts(analytics) {
 // =====================================
 const operatorForm = document.getElementById("operatorForm");
 const operatorTableBody = document.getElementById("operatorTableBody");
+const operatorEditModal = document.getElementById("operatorEditModal");
+const operatorEditForm = document.getElementById("operatorEditForm");
+const closeOperatorModal = document.getElementById("closeOperatorModal");
+const cancelOperatorEdit = document.getElementById("cancelOperatorEdit");
+const editOperatorName = document.getElementById("editOperatorName");
+const editOperatorPassword = document.getElementById("editOperatorPassword");
+const editOperatorGrids = document.getElementById("editOperatorGrids");
+const editOperatorGridCount = document.getElementById("editOperatorGridCount");
+const editOperatorLocation = document.getElementById("editOperatorLocation");
+let editingOperatorId = null;
 
 async function loadOperators() {
   try {
@@ -465,7 +509,7 @@ async function loadOperators() {
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${operator.name}</td>
-        <td>${operator.password}</td>
+        <td>********</td>
         <td>${operator.gridCount}</td>
         <td>${operator.location}</td>
         <td>
@@ -473,6 +517,10 @@ async function loadOperators() {
           <button class="ghost-btn danger-btn" data-operator-id="${operator.id}">Delete</button>
         </td>
       `;
+      tr.dataset.operatorName = operator.name;
+      tr.dataset.operatorGridCount = operator.gridCount;
+      tr.dataset.operatorLocation = operator.location;
+      tr.dataset.operatorGrids = (operator.assignedMicrogrids || []).join(",");
       operatorTableBody.appendChild(tr);
     });
 
@@ -516,51 +564,15 @@ operatorTableBody.addEventListener("click", async (event) => {
   if (editButton) {
     const operatorId = editButton.getAttribute("data-operator-edit-id");
     const row = editButton.closest("tr");
-    const currentName = row?.children?.[0]?.textContent?.trim() || "";
-    const currentPassword = row?.children?.[1]?.textContent?.trim() || "";
-    const currentGridCount = row?.children?.[2]?.textContent?.trim() || "0";
-    const currentLocation = row?.children?.[3]?.textContent?.trim() || "";
+    editingOperatorId = operatorId;
+    editOperatorName.value = row?.dataset?.operatorName || "";
+    editOperatorPassword.value = "";
+    editOperatorGrids.value = row?.dataset?.operatorGrids || "";
+    editOperatorGridCount.value = row?.dataset?.operatorGridCount || "0";
+    editOperatorLocation.value = row?.dataset?.operatorLocation || "";
 
-    const name = prompt("Operator name", currentName);
-    if (name === null) {
-      return;
-    }
-    const password = prompt("Operator password", currentPassword);
-    if (password === null) {
-      return;
-    }
-    const gridCountInput = prompt("Number of grids", currentGridCount);
-    if (gridCountInput === null) {
-      return;
-    }
-    const location = prompt("Location", currentLocation);
-    if (location === null) {
-      return;
-    }
-
-    try {
-      const response = await authFetch(`${API_BASE}/company/operators/${operatorId}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          name,
-          password,
-          gridCount: Number(gridCountInput),
-          location,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        alert(data.message || "Failed to update operator");
-        return;
-      }
-
-      await loadOperators();
-      return;
-    } catch (error) {
-      console.error("Failed to update operator:", error);
-      return;
-    }
+    operatorEditModal.classList.add("active");
+    return;
   }
 
   const button = event.target.closest("button[data-operator-id]");
@@ -587,6 +599,60 @@ operatorTableBody.addEventListener("click", async (event) => {
     await loadOperators();
   } catch (error) {
     console.error("Failed to delete operator:", error);
+  }
+});
+
+function closeOperatorEditModal() {
+  operatorEditModal.classList.remove("active");
+  editingOperatorId = null;
+}
+
+closeOperatorModal.addEventListener("click", closeOperatorEditModal);
+cancelOperatorEdit.addEventListener("click", closeOperatorEditModal);
+
+operatorEditForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!editingOperatorId) {
+    return;
+  }
+
+  const payload = {
+    name: editOperatorName.value.trim(),
+    location: editOperatorLocation.value.trim(),
+  };
+
+  const password = editOperatorPassword.value.trim();
+  if (password) {
+    payload.password = password;
+  }
+
+  const gridListRaw = editOperatorGrids.value.trim();
+  if (gridListRaw) {
+    const numbers = gridListRaw
+      .split(",")
+      .map((value) => Number(String(value).trim()))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    payload.assignedMicrogrids = numbers.map((value) => `mg-${value}`);
+  } else if (editOperatorGridCount.value !== "") {
+    payload.gridCount = Number(editOperatorGridCount.value);
+  }
+
+  try {
+    const response = await authFetch(`${API_BASE}/company/operators/${editingOperatorId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      alert(data.message || "Failed to update operator");
+      return;
+    }
+
+    closeOperatorEditModal();
+    await loadOperators();
+  } catch (error) {
+    console.error("Failed to update operator:", error);
   }
 });
 
@@ -704,6 +770,12 @@ const totalCustomersCount = document.getElementById("totalCustomersCount");
 const pendingBillsCount = document.getElementById("pendingBillsCount");
 const totalRevenueAmount = document.getElementById("totalRevenueAmount");
 const billingSummaryBody = document.getElementById("billingSummaryBody");
+const disputesTableBody = document.getElementById("disputesTableBody");
+const refreshDisputesBtn = document.getElementById("refreshDisputesBtn");
+const maintenanceTableBody = document.getElementById("maintenanceTableBody");
+const refreshMaintenanceBtn = document.getElementById("refreshMaintenanceBtn");
+const auditTableBody = document.getElementById("auditTableBody");
+const refreshAuditBtn = document.getElementById("refreshAuditBtn");
 
 async function loadBillingOverview() {
   try {
@@ -726,6 +798,93 @@ async function loadBillingOverview() {
     await loadTariffRateHistory();
   } catch (error) {
     console.error("Failed to load billing overview:", error);
+  }
+}
+
+async function loadDisputes() {
+  try {
+    const response = await authFetch(`${API_BASE}/company/billing/disputes?limit=50`);
+    const payload = await response.json();
+    const disputes = payload.disputes || [];
+
+    disputesTableBody.innerHTML = "";
+    if (!disputes.length) {
+      disputesTableBody.innerHTML = '<tr><td colspan="5" class="no-alerts">No disputes found</td></tr>';
+      return;
+    }
+
+    disputes.forEach((entry) => {
+      const tr = document.createElement("tr");
+      const statusClass = entry.status === "OPEN" ? "text-warning" : "text-success";
+      const actionLabel = entry.status === "OPEN" ? "Resolve" : "View";
+      tr.innerHTML = `
+        <td>${entry.customerId}</td>
+        <td>${entry.month}</td>
+        <td>${entry.reason}</td>
+        <td><span class="${statusClass}">${entry.status}</span></td>
+        <td><button class="ghost-btn" data-dispute-id="${entry.id}" data-dispute-status="${entry.status}">${actionLabel}</button></td>
+      `;
+      disputesTableBody.appendChild(tr);
+    });
+  } catch (error) {
+    console.error("Failed to load disputes:", error);
+  }
+}
+
+async function loadMaintenanceTickets() {
+  try {
+    const response = await authFetch(`${API_BASE}/company/maintenance/tickets?limit=50`);
+    const payload = await response.json();
+    const tickets = payload.tickets || [];
+
+    maintenanceTableBody.innerHTML = "";
+    if (!tickets.length) {
+      maintenanceTableBody.innerHTML = '<tr><td colspan="5" class="no-alerts">No maintenance tickets</td></tr>';
+      return;
+    }
+
+    tickets.forEach((ticket) => {
+      const statusClass = ticket.status === "RESOLVED" ? "text-success" : "text-warning";
+      const actionLabel = ticket.status === "RESOLVED" ? "View" : "Resolve";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${ticket.gridId}</td>
+        <td>${ticket.title}</td>
+        <td>${ticket.priority}</td>
+        <td><span class="${statusClass}">${ticket.status}</span></td>
+        <td><button class="ghost-btn" data-maintenance-id="${ticket.id}" data-maintenance-status="${ticket.status}">${actionLabel}</button></td>
+      `;
+      maintenanceTableBody.appendChild(tr);
+    });
+  } catch (error) {
+    console.error("Failed to load maintenance tickets:", error);
+  }
+}
+
+async function loadAuditLogs() {
+  try {
+    const response = await authFetch(`${API_BASE}/company/audit/logs?limit=50`);
+    const payload = await response.json();
+    const rows = payload.rows || [];
+
+    auditTableBody.innerHTML = "";
+    if (!rows.length) {
+      auditTableBody.innerHTML = '<tr><td colspan="4" class="no-alerts">No audit logs</td></tr>';
+      return;
+    }
+
+    rows.forEach((entry) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${new Date(entry.createdAt).toLocaleString()}</td>
+        <td>${entry.actorRole} (${entry.actorId})</td>
+        <td>${entry.action}</td>
+        <td>${entry.targetType} ${entry.targetId}</td>
+      `;
+      auditTableBody.appendChild(tr);
+    });
+  } catch (error) {
+    console.error("Failed to load audit logs:", error);
   }
 }
 
@@ -805,6 +964,79 @@ async function saveTariffRate() {
 }
 
 saveTariffRateBtn.addEventListener("click", saveTariffRate);
+refreshDisputesBtn.addEventListener("click", loadDisputes);
+refreshMaintenanceBtn.addEventListener("click", loadMaintenanceTickets);
+refreshAuditBtn.addEventListener("click", loadAuditLogs);
+
+disputesTableBody.addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-dispute-id]");
+  if (!button) {
+    return;
+  }
+
+  const disputeId = button.getAttribute("data-dispute-id");
+  const status = button.getAttribute("data-dispute-status");
+  if (!disputeId || status !== "OPEN") {
+    return;
+  }
+
+  const resolution = prompt("Resolution notes");
+  if (!resolution) {
+    return;
+  }
+
+  const reject = confirm("Reject this dispute? Click OK to reject, Cancel to resolve.");
+  const newStatus = reject ? "REJECTED" : "RESOLVED";
+
+  try {
+    const response = await authFetch(`${API_BASE}/company/billing/disputes/${disputeId}`, {
+      method: "PUT",
+      body: JSON.stringify({ resolution, status: newStatus }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      alert(data.message || "Failed to update dispute");
+      return;
+    }
+
+    await loadDisputes();
+  } catch (error) {
+    console.error("Failed to update dispute:", error);
+  }
+});
+
+maintenanceTableBody.addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-maintenance-id]");
+  if (!button) {
+    return;
+  }
+
+  const ticketId = button.getAttribute("data-maintenance-id");
+  const status = button.getAttribute("data-maintenance-status");
+  if (!ticketId || status === "RESOLVED") {
+    return;
+  }
+
+  const assignedTo = prompt("Assign to (optional)") || "";
+
+  try {
+    const response = await authFetch(`${API_BASE}/company/maintenance/tickets/${ticketId}`, {
+      method: "PUT",
+      body: JSON.stringify({ status: "RESOLVED", assignedTo }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      alert(data.message || "Failed to update ticket");
+      return;
+    }
+
+    await loadMaintenanceTickets();
+  } catch (error) {
+    console.error("Failed to update ticket:", error);
+  }
+});
 
 // =====================================
 // Reports

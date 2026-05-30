@@ -138,7 +138,7 @@ async function getEnergyData(req, res) {
     const energyData = await buildUnifiedEnergyData();
     const requestedType = String(req.query.type || "day").toLowerCase();
     const comparisonType = ["day", "month", "year"].includes(requestedType) ? requestedType : "day";
-    const scopedGridIds = getScopedGridIds(req);
+    const scopedGridIds = await getScopedGridIds(req);
 
     let scopedGrids = [...energyData.grids];
     if (Array.isArray(scopedGridIds)) {
@@ -207,7 +207,7 @@ async function getAdminAnalytics(req, res) {
       buildUnifiedEnergyData(),
     ]);
 
-    const scopedGridIds = getScopedGridIds(req);
+    const scopedGridIds = await getScopedGridIds(req);
     const scopedEnergyGrids = Array.isArray(scopedGridIds)
       ? energyData.grids.filter((grid) => new Set(scopedGridIds).has(Number(grid.gridId)))
       : energyData.grids;

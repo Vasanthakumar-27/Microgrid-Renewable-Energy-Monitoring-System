@@ -8,6 +8,7 @@ const Payment = require("../models/paymentModel");
 
 const CURRENCY = "INR";
 const monthPattern = /^\d{4}-(0[1-9]|1[0-2])$/;
+const PAYMENT_METHODS = ["ONLINE", "CASH", "BANK_TRANSFER", "CHEQUE", "UPI"];
 
 function currentMonthKey() {
   return new Date().toISOString().slice(0, 7);
@@ -19,6 +20,14 @@ function validateMonthKey(value) {
   }
 
   return monthPattern.test(value) ? value : null;
+}
+
+function assertValidMonthKey(monthKey) {
+  if (!monthPattern.test(String(monthKey))) {
+    const error = new Error("month must be in YYYY-MM format");
+    error.code = "INVALID_MONTH";
+    throw error;
+  }
 }
 
 function deterministicFactor(seed, min, max) {
@@ -53,6 +62,7 @@ function toPlainBill(doc) {
 }
 
 async function ensureMonthlyBill(customer, monthKey, options = {}) {
+  assertValidMonthKey(monthKey);
   const existing = await Bill.findOne({ customerId: customer.id, month: monthKey }).lean();
   if (existing) {
     return toPlainBill(existing);
@@ -115,8 +125,11 @@ async function getBillHistory(customer, options = {}) {
 
   let cursor = Bill.find(query).sort({ month: -1 });
 
-  if (options.limit) {
-    cursor = cursor.limit(Number(options.limit));
+  const limit = Number(options.limit) || 0;
+  const page = Math.max(1, Number(options.page) || 1);
+
+  if (limit > 0) {
+    cursor = cursor.limit(limit).skip((page - 1) * limit);
   }
 
   const docs = await cursor.lean();
@@ -124,6 +137,10 @@ async function getBillHistory(customer, options = {}) {
 }
 
 async function applyPayment(customer, monthKey, amount, method = "ONLINE") {
+  assertValidMonthKey(monthKey);
+  const normalizedMethod = PAYMENT_METHODS.includes(String(method).toUpperCase())
+    ? String(method).toUpperCase()
+    : "ONLINE";
   const bill = await ensureMonthlyBill(customer, monthKey);
   const normalizedAmount = Number(amount || 0);
   const appliedAmount = roundToTwo(Math.min(normalizedAmount, bill.remainingAmount));
@@ -155,7 +172,7 @@ async function applyPayment(customer, monthKey, amount, method = "ONLINE") {
     amount: appliedAmount,
     currency: CURRENCY,
     status: "PAID",
-    method,
+    method: normalizedMethod,
     date: new Date(),
   };
 
@@ -177,8 +194,16 @@ async function applyPayment(customer, monthKey, amount, method = "ONLINE") {
   };
 }
 
-async function getPaymentHistory(customerId) {
-  const rows = await Payment.find({ customerId }).sort({ date: -1 }).lean();
+async function getPaymentHistory(customerId, options = {}) {
+  const limit = Number(options.limit) || 0;
+  const page = Math.max(1, Number(options.page) || 1);
+
+  let cursor = Payment.find({ customerId }).sort({ date: -1 });
+  if (limit > 0) {
+    cursor = cursor.limit(limit).skip((page - 1) * limit);
+  }
+
+  const rows = await cursor.lean();
   return rows.map((row) => ({
     id: row.paymentId,
     customerId: row.customerId,

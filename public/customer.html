@@ -165,6 +165,16 @@
                 <span>Total Due</span>
                 <span id="billTotal">INR 0.00</span>
               </div>
+              <div class="bill-row">
+                <span>Payment Method</span>
+                <select id="paymentMethodSelectCompact" class="inline-select">
+                  <option value="ONLINE" selected>Online</option>
+                  <option value="UPI">UPI</option>
+                  <option value="CASH">Cash</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                  <option value="CHEQUE">Cheque</option>
+                </select>
+              </div>
               <button class="btn-pay" id="payBtn">Pay Now</button>
             </div>
           </div>
@@ -192,6 +202,10 @@
           <div class="table-header" style="position: relative; z-index: 2;">Current Month Bill</div>
           <div class="billing-details" style="position: relative; z-index: 2;">
             <div class="bill-row">
+              <span>Select Month</span>
+              <select id="billMonthSelect" class="inline-select"></select>
+            </div>
+            <div class="bill-row">
               <span>Month</span>
               <span id="billMonth">-- </span>
             </div>
@@ -211,6 +225,16 @@
               <span>Status</span>
               <span id="billStatus">Pending</span>
             </div>
+            <div class="bill-row">
+              <span>Payment Method</span>
+              <select id="paymentMethodSelect" class="inline-select">
+                <option value="ONLINE" selected>Online</option>
+                <option value="UPI">UPI</option>
+                <option value="CASH">Cash</option>
+                <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="CHEQUE">Cheque</option>
+              </select>
+            </div>
             <button class="btn-pay" id="payNowBtn">Pay Now</button>
           </div>
         </div>
@@ -227,10 +251,16 @@
                   <th>Paid (INR)</th>
                   <th>Remaining (INR)</th>
                   <th>Status</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody id="billHistoryBody"></tbody>
             </table>
+          </div>
+          <div class="pagination-controls">
+            <button id="billPrevBtn" class="ghost-btn">Prev</button>
+            <span id="billPageLabel">Page 1</span>
+            <button id="billNextBtn" class="ghost-btn">Next</button>
           </div>
         </div>
       </section>
@@ -255,11 +285,58 @@
               <tbody id="paymentHistoryBody"></tbody>
             </table>
           </div>
+          <div class="pagination-controls">
+            <button id="paymentPrevBtn" class="ghost-btn">Prev</button>
+            <span id="paymentPageLabel">Page 1</span>
+            <button id="paymentNextBtn" class="ghost-btn">Next</button>
+          </div>
         </div>
 
         <div class="table-card alerts-panel">
           <div class="table-header">Insights</div>
           <ul class="alerts-list" id="customerInsightsList"></ul>
+        </div>
+
+        <div class="table-card" style="margin-top:1.2rem;">
+          <div class="table-header table-header-row">
+            <span>Notifications</span>
+            <button id="refreshNotificationsBtn" class="ghost-btn">Refresh</button>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Title</th>
+                  <th>Message</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="notificationsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-card" style="margin-top:1.2rem;">
+          <div class="table-header">My Profile</div>
+          <form id="customerProfileForm" class="stack-form">
+            <label>Name</label>
+            <input id="profileName" type="text" required>
+
+            <label>Phone</label>
+            <input id="profilePhone" type="text" required>
+
+            <label>Email</label>
+            <input id="profileEmail" type="text">
+
+            <label>Location</label>
+            <input id="profileLocation" type="text" required>
+
+            <label>New Password (optional)</label>
+            <input id="profilePassword" type="text">
+
+            <button type="submit" class="primary-btn">Update Profile</button>
+          </form>
         </div>
       </section>
     </main>

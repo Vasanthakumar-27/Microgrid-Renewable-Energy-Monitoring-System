@@ -14,7 +14,16 @@ const {
 	setTariffRate,
 	getTariffRateHistory,
 	getBillingSummary,
+	getAuditLogHistory,
 } = require("../controllers/companyController");
+const {
+	listAllDisputes,
+	resolveDispute,
+} = require("../controllers/disputeController");
+const {
+	listMaintenanceTickets,
+	updateMaintenanceTicket,
+} = require("../controllers/maintenanceController");
 const roleCheck = require("../middleware/roleMiddleware");
 const { authRequired } = require("../middleware/authMiddleware");
 
@@ -34,5 +43,10 @@ router.get("/billing/tariff-rate", authRequired, roleCheck("admin"), getTariffRa
 router.post("/billing/tariff-rate", authRequired, roleCheck("admin"), setTariffRate);
 router.get("/billing/tariff-rate/history", authRequired, roleCheck("admin"), getTariffRateHistory);
 router.get("/billing/summary", authRequired, roleCheck("admin"), getBillingSummary);
+router.get("/billing/disputes", authRequired, roleCheck("admin"), listAllDisputes);
+router.put("/billing/disputes/:id", authRequired, roleCheck("admin"), resolveDispute);
+router.get("/audit/logs", authRequired, roleCheck("admin"), getAuditLogHistory);
+router.get("/maintenance/tickets", authRequired, roleCheck("admin"), listMaintenanceTickets);
+router.put("/maintenance/tickets/:id", authRequired, roleCheck("admin"), updateMaintenanceTicket);
 
 module.exports = router;

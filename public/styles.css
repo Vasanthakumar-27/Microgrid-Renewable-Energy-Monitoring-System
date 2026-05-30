@@ -465,6 +465,73 @@ tr:last-child td {
   gap: 0.9rem;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-backdrop.active {
+  display: flex;
+}
+
+.modal-card {
+  width: min(520px, 92vw);
+  background: #2b4d3c;
+  border: 1px solid rgba(61, 107, 84, 0.6);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.secondary-btn {
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(61, 107, 84, 0.6);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  margin-top: 0.8rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.inline-select {
+  background: rgba(30, 58, 47, 0.5);
+  border: 1px solid rgba(61, 107, 84, 0.5);
+  border-radius: 10px;
+  padding: 0.4rem 0.6rem;
+  color: var(--text-primary);
+}
+
 .heatmap-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));

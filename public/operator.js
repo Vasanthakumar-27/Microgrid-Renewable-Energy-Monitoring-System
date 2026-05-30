@@ -81,6 +81,7 @@ function switchOperatorView(view) {
 
   if (view === "customers") {
     loadCustomerModule();
+    loadOperatorDisputes();
   } else if (view === "alerts") {
     loadOperatorAlertsModule();
   }
@@ -107,6 +108,27 @@ const operatorCustomerTableBody = document.getElementById("operatorCustomerTable
 const operatorHistoryCustomerSelect = document.getElementById("operatorHistoryCustomerSelect");
 const operatorHistoryLoadBtn = document.getElementById("operatorHistoryLoadBtn");
 const operatorHistoryTableBody = document.getElementById("operatorHistoryTableBody");
+const operatorDisputesBody = document.getElementById("operatorDisputesBody");
+const refreshOperatorDisputesBtn = document.getElementById("refreshOperatorDisputesBtn");
+
+const maintenanceTicketForm = document.getElementById("maintenanceTicketForm");
+const maintenanceGridId = document.getElementById("maintenanceGridId");
+const maintenanceTitle = document.getElementById("maintenanceTitle");
+const maintenanceDescription = document.getElementById("maintenanceDescription");
+const maintenancePriority = document.getElementById("maintenancePriority");
+const refreshMaintenanceTicketsBtn = document.getElementById("refreshMaintenanceTicketsBtn");
+const operatorMaintenanceBody = document.getElementById("operatorMaintenanceBody");
+
+const customerEditModal = document.getElementById("customerEditModal");
+const customerEditForm = document.getElementById("customerEditForm");
+const closeCustomerModal = document.getElementById("closeCustomerModal");
+const cancelCustomerEdit = document.getElementById("cancelCustomerEdit");
+const editCustomerName = document.getElementById("editCustomerName");
+const editCustomerPhone = document.getElementById("editCustomerPhone");
+const editCustomerEmail = document.getElementById("editCustomerEmail");
+const editCustomerLocation = document.getElementById("editCustomerLocation");
+const editCustomerPassword = document.getElementById("editCustomerPassword");
+let editingCustomerId = null;
 
 const operatorAlertsModuleList = document.getElementById("operatorAlertsModuleList");
 const refreshOperatorAlertsBtn = document.getElementById("refreshOperatorAlertsBtn");
@@ -382,6 +404,10 @@ async function loadCustomerModule() {
         <td><span class="${customer.status === "paid" ? "text-success" : "text-danger"}">${customer.status}</span></td>
         <td><button class="ghost-btn" data-customer-edit-id="${customer.id}">Edit</button></td>
       `;
+      tr.dataset.customerName = customer.name;
+      tr.dataset.customerPhone = customer.phone || "";
+      tr.dataset.customerLocation = customer.location || "";
+      tr.dataset.customerEmail = customer.email || "";
       operatorCustomerTableBody.appendChild(tr);
     });
 
@@ -467,27 +493,45 @@ operatorCustomerTableBody.addEventListener("click", async (event) => {
 
   const customerId = button.getAttribute("data-customer-edit-id");
   const row = button.closest("tr");
-  const currentName = row?.children?.[0]?.textContent?.trim() || "";
-  const currentPhone = row?.children?.[1]?.textContent?.trim() || "";
-  const currentLocation = row?.children?.[2]?.textContent?.trim() || "";
+  editingCustomerId = customerId;
+  editCustomerName.value = row?.dataset?.customerName || "";
+  editCustomerPhone.value = row?.dataset?.customerPhone || "";
+  editCustomerEmail.value = row?.dataset?.customerEmail || "";
+  editCustomerLocation.value = row?.dataset?.customerLocation || "";
+  editCustomerPassword.value = "";
+  customerEditModal.classList.add("active");
+});
 
-  const name = prompt("Customer name", currentName);
-  if (name === null) {
+function closeCustomerEditModal() {
+  customerEditModal.classList.remove("active");
+  editingCustomerId = null;
+}
+
+closeCustomerModal.addEventListener("click", closeCustomerEditModal);
+cancelCustomerEdit.addEventListener("click", closeCustomerEditModal);
+
+customerEditForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!editingCustomerId) {
     return;
   }
-  const phone = prompt("Phone", currentPhone);
-  if (phone === null) {
-    return;
-  }
-  const location = prompt("Location", currentLocation);
-  if (location === null) {
-    return;
+
+  const payload = {
+    name: editCustomerName.value.trim(),
+    phone: editCustomerPhone.value.trim(),
+    email: editCustomerEmail.value.trim(),
+    location: editCustomerLocation.value.trim(),
+  };
+
+  const password = editCustomerPassword.value.trim();
+  if (password) {
+    payload.password = password;
   }
 
   try {
-    const response = await authFetch(`${API_BASE}/operator/customer/${customerId}`, {
+    const response = await authFetch(`${API_BASE}/operator/customer/${editingCustomerId}`, {
       method: "PUT",
-      body: JSON.stringify({ name, phone, location }),
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json();
@@ -496,9 +540,138 @@ operatorCustomerTableBody.addEventListener("click", async (event) => {
       return;
     }
 
+    closeCustomerEditModal();
     await loadCustomerModule();
   } catch (error) {
     console.error("Failed to update customer:", error);
+  }
+});
+
+async function loadOperatorDisputes() {
+  try {
+    const response = await authFetch(`${API_BASE}/operator/disputes`);
+    const payload = await response.json();
+    const disputes = payload.disputes || [];
+
+    operatorDisputesBody.innerHTML = "";
+    if (!disputes.length) {
+      operatorDisputesBody.innerHTML = '<tr><td colspan="5" class="no-alerts">No disputes</td></tr>';
+      return;
+    }
+
+    disputes.forEach((entry) => {
+      const statusClass = entry.status === "OPEN" ? "text-warning" : "text-success";
+      const actionLabel = entry.status === "OPEN" ? "Resolve" : "View";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${entry.customerId}</td>
+        <td>${entry.month}</td>
+        <td>${entry.reason}</td>
+        <td><span class="${statusClass}">${entry.status}</span></td>
+        <td><button class="ghost-btn" data-dispute-id="${entry.id}" data-dispute-status="${entry.status}">${actionLabel}</button></td>
+      `;
+      operatorDisputesBody.appendChild(tr);
+    });
+  } catch (error) {
+    console.error("Failed to load disputes:", error);
+  }
+}
+
+operatorDisputesBody.addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-dispute-id]");
+  if (!button) {
+    return;
+  }
+
+  const disputeId = button.getAttribute("data-dispute-id");
+  const status = button.getAttribute("data-dispute-status");
+  if (!disputeId || status !== "OPEN") {
+    return;
+  }
+
+  const resolution = prompt("Resolution notes");
+  if (!resolution) {
+    return;
+  }
+
+  const reject = confirm("Reject this dispute? Click OK to reject, Cancel to resolve.");
+  const newStatus = reject ? "REJECTED" : "RESOLVED";
+
+  try {
+    const response = await authFetch(`${API_BASE}/operator/disputes/${disputeId}`, {
+      method: "PUT",
+      body: JSON.stringify({ resolution, status: newStatus }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      alert(data.message || "Failed to update dispute");
+      return;
+    }
+
+    await loadOperatorDisputes();
+  } catch (error) {
+    console.error("Failed to update dispute:", error);
+  }
+});
+
+async function loadMaintenanceTickets() {
+  try {
+    const response = await authFetch(`${API_BASE}/operator/maintenance/tickets?limit=50`);
+    const payload = await response.json();
+    const tickets = payload.tickets || [];
+
+    operatorMaintenanceBody.innerHTML = "";
+    if (!tickets.length) {
+      operatorMaintenanceBody.innerHTML = '<tr><td colspan="5" class="no-alerts">No maintenance tickets</td></tr>';
+      return;
+    }
+
+    tickets.forEach((ticket) => {
+      const statusClass = ticket.status === "RESOLVED" ? "text-success" : "text-warning";
+      const actionLabel = ticket.status === "RESOLVED" ? "View" : "Resolve";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${ticket.gridId}</td>
+        <td>${ticket.title}</td>
+        <td>${ticket.priority}</td>
+        <td><span class="${statusClass}">${ticket.status}</span></td>
+        <td><button class="ghost-btn" data-ticket-id="${ticket.id}" data-ticket-status="${ticket.status}">${actionLabel}</button></td>
+      `;
+      operatorMaintenanceBody.appendChild(tr);
+    });
+  } catch (error) {
+    console.error("Failed to load maintenance tickets:", error);
+  }
+}
+
+operatorMaintenanceBody.addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-ticket-id]");
+  if (!button) {
+    return;
+  }
+
+  const ticketId = button.getAttribute("data-ticket-id");
+  const status = button.getAttribute("data-ticket-status");
+  if (!ticketId || status === "RESOLVED") {
+    return;
+  }
+
+  try {
+    const response = await authFetch(`${API_BASE}/operator/maintenance/tickets/${ticketId}`, {
+      method: "PUT",
+      body: JSON.stringify({ status: "RESOLVED" }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      alert(data.message || "Failed to update maintenance ticket");
+      return;
+    }
+
+    await loadMaintenanceTickets();
+  } catch (error) {
+    console.error("Failed to update maintenance ticket:", error);
   }
 });
 
@@ -568,6 +741,8 @@ async function loadOperatorResolvedAlertsHistory() {
 }
 
 refreshOperatorAlertsBtn.addEventListener("click", loadOperatorAlertsModule);
+refreshOperatorDisputesBtn.addEventListener("click", loadOperatorDisputes);
+refreshMaintenanceTicketsBtn.addEventListener("click", loadMaintenanceTickets);
 operatorAlertsModuleList.addEventListener("click", async (event) => {
   const button = event.target.closest("button[data-alert-id]");
   if (!button) {
@@ -597,6 +772,7 @@ operatorAlertsModuleList.addEventListener("click", async (event) => {
   }
 });
 operatorComparisonRefreshBtn.addEventListener("click", loadOperatorEnergyComparison);
+operatorComparisonType.addEventListener("change", loadOperatorEnergyComparison);
 operatorHistoryLoadBtn.addEventListener("click", () => {
   if (!operatorHistoryCustomerSelect.value) {
     return;
@@ -604,8 +780,39 @@ operatorHistoryLoadBtn.addEventListener("click", () => {
   loadOperatorCustomerHistory(operatorHistoryCustomerSelect.value);
 });
 
+maintenanceTicketForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const payload = {
+    gridId: Number(maintenanceGridId.value),
+    title: maintenanceTitle.value.trim(),
+    description: maintenanceDescription.value.trim(),
+    priority: maintenancePriority.value,
+  };
+
+  try {
+    const response = await authFetch(`${API_BASE}/operator/maintenance/tickets`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      alert(data.message || "Failed to create maintenance ticket");
+      return;
+    }
+
+    maintenanceTicketForm.reset();
+    maintenancePriority.value = "MEDIUM";
+    await loadMaintenanceTickets();
+  } catch (error) {
+    console.error("Failed to create maintenance ticket:", error);
+  }
+});
+
 (async function init() {
   await fetchDashboardData();
   setInterval(fetchDashboardData, 5000);
   switchOperatorView("dashboard");
+  await loadOperatorDisputes();
+  await loadMaintenanceTickets();
 })();

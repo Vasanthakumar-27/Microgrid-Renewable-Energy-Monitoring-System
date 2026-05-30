@@ -12,7 +12,22 @@ const {
   getBillHistory,
   currentMonthKey,
 } = require("../data/billingStore");
+const { logAudit } = require("../data/auditLogStore");
 const CURRENCY = "INR";
+
+function isValidPhone(value) {
+  if (!value) {
+    return false;
+  }
+  return /^\d{10,15}$/.test(String(value).trim());
+}
+
+function isValidEmail(value) {
+  if (!value) {
+    return false;
+  }
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim());
+}
 
 async function getTargetOperator(req) {
   const operatorId = req.user?.operatorId || req.query.operatorId;
@@ -52,6 +67,14 @@ const createCustomer = async (req, res) => {
     });
   }
 
+  if (!isValidPhone(phone)) {
+    return res.status(400).json({ message: "phone must be 10-15 digits" });
+  }
+
+  if (req.body?.email && !isValidEmail(req.body.email)) {
+    return res.status(400).json({ message: "email is invalid" });
+  }
+
   const targetOperator = await getTargetOperator(req);
 
   if (!targetOperator) {
@@ -59,6 +82,10 @@ const createCustomer = async (req, res) => {
   }
 
   const assignedGridNumbers = normalizeAssignedGridIds(targetOperator.assignedMicrogrids);
+
+  if (!assignedGridNumbers.length) {
+    return res.status(400).json({ message: "Operator has no assigned grids" });
+  }
   const requestedGrid = Number.isFinite(Number(gridId)) && Number(gridId) > 0
     ? Number(gridId)
     : Number(assignedGridNumbers[0] || 1);
@@ -81,6 +108,7 @@ const createCustomer = async (req, res) => {
     password,
     name,
     phone,
+    email: req.body?.email ? String(req.body.email).trim() : undefined,
     location,
     gridId: requestedGrid,
     energyUsage: energyUsage ?? 0,
@@ -91,6 +119,15 @@ const createCustomer = async (req, res) => {
 
   customers.push(newCustomer);
   await operatorStore.addCustomerToOperator(targetOperator.id, newCustomer.id);
+
+  await logAudit({
+    actorRole: req.user?.role || "operator",
+    actorId: targetOperator.id,
+    action: "CUSTOMER_CREATED",
+    targetType: "customer",
+    targetId: newCustomer.id,
+    metadata: { gridId: newCustomer.gridId },
+  });
 
   return res.status(201).json({
     message: "Customer created successfully",
@@ -187,6 +224,7 @@ const getOperatorCustomers = async (req, res) => {
       id: customer.id,
       name: customer.name,
       phone: customer.phone || "NA",
+      email: customer.email || "",
       location: customer.location || "NA",
       gridId: candidateGrid,
       currency: CURRENCY,
@@ -214,7 +252,9 @@ const getOperatorCustomerBillHistory = async (req, res) => {
     return res.status(404).json({ message: "Customer not managed by this operator" });
   }
 
-  const history = await getBillHistory(customer);
+  const limit = req.query.limit ? Number(req.query.limit) : null;
+  const page = req.query.page ? Number(req.query.page) : null;
+  const history = await getBillHistory(customer, { limit, page });
 
   return res.status(200).json({
     customer: {
@@ -223,6 +263,8 @@ const getOperatorCustomerBillHistory = async (req, res) => {
       gridId: customer.gridId || null,
     },
     currency: CURRENCY,
+    page: page || 1,
+    limit: limit || null,
     history,
   });
 };
@@ -339,7 +381,20 @@ const updateOperatorCustomer = async (req, res) => {
   if (req.body?.phone !== undefined) {
     const nextPhone = String(req.body.phone).trim();
     if (nextPhone) {
+      if (!isValidPhone(nextPhone)) {
+        return res.status(400).json({ message: "phone must be 10-15 digits" });
+      }
       customer.phone = nextPhone;
+    }
+  }
+
+  if (req.body?.email !== undefined) {
+    const nextEmail = String(req.body.email).trim();
+    if (nextEmail) {
+      if (!isValidEmail(nextEmail)) {
+        return res.status(400).json({ message: "email is invalid" });
+      }
+      customer.email = nextEmail;
     }
   }
 
@@ -352,12 +407,21 @@ const updateOperatorCustomer = async (req, res) => {
 
   const bill = await ensureCurrentMonthlyBill(customer);
 
+  await logAudit({
+    actorRole: req.user?.role || "operator",
+    actorId: targetOperator.id,
+    action: "CUSTOMER_UPDATED",
+    targetType: "customer",
+    targetId: customer.id,
+  });
+
   return res.status(200).json({
     message: "Customer updated",
     customer: {
       id: customer.id,
       name: customer.name,
       phone: customer.phone || "NA",
+      email: customer.email || "",
       location: customer.location || "NA",
       gridId: customer.gridId || null,
       currency: CURRENCY,

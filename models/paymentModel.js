@@ -36,11 +36,28 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       required: true,
       default: "ONLINE",
+      enum: ["ONLINE", "RAZORPAY", "CASH", "BANK_TRANSFER", "CHEQUE", "UPI", "E_WALLET"],
     },
     date: {
       type: Date,
       required: true,
       default: Date.now,
+    },
+    razorpayOrderId: {
+      type: String,
+      index: true,
+      default: null,
+    },
+    razorpayPaymentId: {
+      type: String,
+      index: true,
+      unique: true,
+      sparse: true,
+      default: null,
+    },
+    notes: {
+      type: String,
+      default: '',
     },
   },
   {
@@ -48,5 +65,7 @@ const paymentSchema = new mongoose.Schema(
     versionKey: false,
   }
 );
+
+paymentSchema.index({ customerId: 1, date: -1 });
 
 module.exports = mongoose.model("Payment", paymentSchema);

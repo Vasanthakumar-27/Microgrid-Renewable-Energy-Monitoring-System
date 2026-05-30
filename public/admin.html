@@ -41,6 +41,10 @@
           <select id="adminOperatorFilter" title="Filter by operator">
             <option value="all">All Operators</option>
           </select>
+          <div class="system-status" id="adminOperatorBadge">
+            Viewing: All Operators
+          </div>
+          <button id="clearOperatorFilterBtn" class="ghost-btn" style="margin-right:0.75rem;">Clear Filter</button>
           <button id="downloadJsonBtn" class="chip-btn chip-blue">Download JSON</button>
           <button id="downloadCsvBtn" class="chip-btn chip-green">Download CSV</button>
           <div class="system-status">
@@ -298,8 +302,100 @@
             </table>
           </div>
         </div>
+
+        <div class="table-card" style="margin-top:1.5rem;">
+          <div class="table-header table-header-row">
+            <span>Bill Disputes</span>
+            <button id="refreshDisputesBtn" class="ghost-btn">Refresh</button>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Month</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="disputesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-card" style="margin-top:1.5rem;">
+          <div class="table-header table-header-row">
+            <span>Maintenance Tickets</span>
+            <button id="refreshMaintenanceBtn" class="ghost-btn">Refresh</button>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Grid</th>
+                  <th>Title</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="maintenanceTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-card" style="margin-top:1.5rem;">
+          <div class="table-header table-header-row">
+            <span>Audit Log</span>
+            <button id="refreshAuditBtn" class="ghost-btn">Refresh</button>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Actor</th>
+                  <th>Action</th>
+                  <th>Target</th>
+                </tr>
+              </thead>
+              <tbody id="auditTableBody"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
     </main>
+  </div>
+
+  <div id="operatorEditModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span>Edit Operator</span>
+        <button class="ghost-btn" id="closeOperatorModal">Close</button>
+      </div>
+      <form id="operatorEditForm" class="stack-form">
+        <label>Name</label>
+        <input id="editOperatorName" type="text" required>
+
+        <label>New Password (leave blank to keep)</label>
+        <input id="editOperatorPassword" type="text">
+
+        <label>Assigned Grids (comma-separated, e.g. 1,2,3)</label>
+        <input id="editOperatorGrids" type="text" placeholder="1,2,3">
+
+        <label>Grid Count</label>
+        <input id="editOperatorGridCount" type="number" min="0">
+
+        <label>Location</label>
+        <input id="editOperatorLocation" type="text">
+
+        <div class="modal-actions">
+          <button type="button" class="secondary-btn" id="cancelOperatorEdit">Cancel</button>
+          <button type="submit" class="primary-btn">Save Changes</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script src="app.js"></script>

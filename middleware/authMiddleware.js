@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
+const config = require("../config/appConfig");
 
-const JWT_SECRET = process.env.JWT_SECRET || "microgrid-dev-secret";
+const JWT_SECRET = config.jwtSecret;
 
 function authRequired(req, res, next) {
   const authHeader = req.headers.authorization || "";
@@ -21,7 +22,32 @@ function authRequired(req, res, next) {
   }
 }
 
+/**
+ * Role-Based Access Control
+ * Checks if user has required role for resource access
+ */
+function roleBasedAccess(allowedRoles = []) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized: No user context" });
+    }
+
+    const userRole = req.user.role;
+    
+    if (!userRole || !allowedRoles.includes(userRole)) {
+      return res.status(403).json({ 
+        message: "Forbidden: Insufficient permissions",
+        requiredRole: allowedRoles,
+        userRole: userRole
+      });
+    }
+
+    return next();
+  };
+}
+
 module.exports = {
   authRequired,
+  roleBasedAccess,
   JWT_SECRET,
 };

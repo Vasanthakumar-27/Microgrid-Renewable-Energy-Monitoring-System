@@ -1,11 +1,12 @@
 const simulator = require("./simulator");
 const operatorStore = require("./operatorStore");
 const Alert = require("../models/alertModel");
+const config = require("../config/appConfig");
 
-const ALERT_TTL_MS = 3 * 60 * 1000;
-const MANUAL_DELETE_DELAY_MS = 30 * 1000;
-const GENERATE_INTERVAL_MS = 20 * 1000;
-const MAX_ALERTS = 40;
+const ALERT_TTL_MS = config.alertTtlMs;
+const MANUAL_DELETE_DELAY_MS = config.alertDeleteDelayMs;
+const GENERATE_INTERVAL_MS = config.alertGenerateIntervalMs;
+const MAX_ALERTS = config.alertMaxOpen;
 
 let generatorStarted = false;
 

@@ -6,17 +6,38 @@
   "scripts": {
     "run": "node run-app.js",
     "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop microgrid-city-system",
+    "pm2:restart": "pm2 restart microgrid-city-system",
+    "pm2:logs": "pm2 logs microgrid-city-system",
+    "pm2:status": "pm2 status",
+    "pm2:monitor": "node pm2-monitor.js",
+    "backup:create": "node backup-manager.js create",
+    "backup:restore": "node backup-manager.js restore",
+    "backup:list": "node backup-manager.js list",
+    "backup:stats": "node backup-manager.js stats",
+    "backup:schedule": "node backup-manager.js schedule"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
+    "bcrypt": "^6.0.0",
+    "bull": "^4.16.5",
     "cors": "^2.8.6",
+    "dotenv": "^16.4.7",
     "express": "^5.2.1",
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.4.1"
+    "mongoose": "^9.4.1",
+    "multer": "^2.1.1",
+    "nodemailer": "^8.0.7",
+    "razorpay": "^2.9.6",
+    "redis": "^5.12.1",
+    "twilio": "^6.0.2",
+    "validator": "^13.15.35"
   }
 }

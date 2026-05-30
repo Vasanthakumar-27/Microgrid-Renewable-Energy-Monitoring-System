@@ -82,6 +82,8 @@ function switchCustomerView(view) {
     loadCurrentBill();
   } else if (view === "history") {
     loadPaymentHistory();
+    loadNotifications();
+    loadProfile();
   }
 }
 
@@ -331,22 +333,33 @@ const billTotalDue = document.getElementById("billTotalDue");
 const billStatus = document.getElementById("billStatus");
 const billStatusRow = document.getElementById("billStatusRow");
 const payNowBtn = document.getElementById("payNowBtn");
+const billMonthSelect = document.getElementById("billMonthSelect");
+const paymentMethodSelect = document.getElementById("paymentMethodSelect");
+const paymentMethodSelectCompact = document.getElementById("paymentMethodSelectCompact");
 const energyBillUsage = document.getElementById("billUsage");
 const energyBillRate = document.getElementById("billRate");
 const energyBillFixed = document.getElementById("billFixed");
 const energyBillTotal = document.getElementById("billTotal");
 const payBtn = document.getElementById("payBtn");
 const billHistoryBody = document.getElementById("billHistoryBody");
+const billPrevBtn = document.getElementById("billPrevBtn");
+const billNextBtn = document.getElementById("billNextBtn");
+const billPageLabel = document.getElementById("billPageLabel");
 
 async function loadCurrentBill() {
   try {
-    const response = await authFetch(`${API_BASE}/customer/${CUSTOMER_ID}/bill-summary`);
+    const monthKey = billMonthSelect?.value || "";
+    const suffix = monthKey ? `?month=${encodeURIComponent(monthKey)}` : "";
+    const response = await authFetch(`${API_BASE}/customer/${CUSTOMER_ID}/bill-summary${suffix}`);
     const bill = await response.json();
 
     const monthDate = new Date(bill.month + "-01");
     const monthName = monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
     billMonth.textContent = monthName;
+    if (billMonthSelect && bill.month) {
+      billMonthSelect.value = bill.month;
+    }
     billUnitsUsed.textContent = `${Number(bill.usage || 0).toFixed(2)} kWh`;
     billCurrentRate.textContent = `${formatInr(bill.usageRate)} / kWh`;
     billTotalDue.textContent = formatInr(bill.totalAmount);
@@ -391,9 +404,29 @@ async function loadCurrentBill() {
   }
 }
 
+function initBillMonthSelect() {
+  if (!billMonthSelect) {
+    return;
+  }
+
+  const now = new Date();
+  billMonthSelect.innerHTML = "";
+  for (let i = 0; i < 12; i += 1) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = label;
+    billMonthSelect.appendChild(option);
+  }
+}
+
 async function loadBillHistory() {
   try {
-    const response = await authFetch(`${API_BASE}/customer/${CUSTOMER_ID}/bills/history?limit=12`);
+    const response = await authFetch(
+      `${API_BASE}/customer/${CUSTOMER_ID}/bills/history?limit=${billHistoryLimit}&page=${billHistoryPage}`
+    );
     const data = await response.json();
     const bills = data.bills || [];
 
@@ -407,6 +440,7 @@ async function loadBillHistory() {
     bills.forEach((bill) => {
       const tr = document.createElement("tr");
       const statusClass = bill.paymentStatus === "paid" ? "text-success" : "text-danger";
+      const actionLabel = bill.paymentStatus === "paid" ? "View" : "Dispute";
       tr.innerHTML = `
         <td>${bill.month}</td>
         <td>${Number(bill.usageUnits || 0).toFixed(2)} kWh</td>
@@ -414,9 +448,14 @@ async function loadBillHistory() {
         <td>${formatInr(bill.paidAmount)}</td>
         <td>${formatInr(bill.remainingAmount)}</td>
         <td><span class="${statusClass}">${bill.paymentStatus}</span></td>
+        <td><button class="ghost-btn" data-dispute-month="${bill.month}" data-dispute-status="${bill.paymentStatus}">${actionLabel}</button></td>
       `;
       billHistoryBody.appendChild(tr);
     });
+
+    if (billPageLabel) {
+      billPageLabel.textContent = `Page ${billHistoryPage}`;
+    }
   } catch (error) {
     console.error("Failed to load bill history:", error);
   }
@@ -424,7 +463,9 @@ async function loadBillHistory() {
 
 async function payCurrentBill() {
   try {
-    const billRes = await authFetch(`${API_BASE}/customer/${CUSTOMER_ID}/bill-summary`);
+    const monthKey = billMonthSelect?.value || "";
+    const suffix = monthKey ? `?month=${encodeURIComponent(monthKey)}` : "";
+    const billRes = await authFetch(`${API_BASE}/customer/${CUSTOMER_ID}/bill-summary${suffix}`);
     const bill = await billRes.json();
 
     const amount = Number(bill.totalAmount || 0);
@@ -433,6 +474,7 @@ async function payCurrentBill() {
       return;
     }
 
+    const selectedMethod = paymentMethodSelect?.value || paymentMethodSelectCompact?.value || "ONLINE";
     const response = await authFetch(`${API_BASE}/customer/payment`, {
       method: "POST",
       body: JSON.stringify({
@@ -440,7 +482,7 @@ async function payCurrentBill() {
         amount,
         month: bill.month,
         currency: "INR",
-        method: "ONLINE",
+        method: selectedMethod,
       }),
     });
 
@@ -450,7 +492,10 @@ async function payCurrentBill() {
       return;
     }
 
-    alert(`Payment Successful\nAmount Paid: ${formatInr(data.appliedAmount)}`);
+    const message = data.capped
+      ? `Payment applied partially. Amount Paid: ${formatInr(data.appliedAmount)} (capped)`
+      : `Payment Successful\nAmount Paid: ${formatInr(data.appliedAmount)}`;
+    alert(message);
 
     // Refresh all views
     await Promise.all([
@@ -468,10 +513,28 @@ async function payCurrentBill() {
 // =====================================
 const paymentHistoryBody = document.getElementById("paymentHistoryBody");
 const refreshHistoryBtn = document.getElementById("refreshHistoryBtn");
+const paymentPrevBtn = document.getElementById("paymentPrevBtn");
+const paymentNextBtn = document.getElementById("paymentNextBtn");
+const paymentPageLabel = document.getElementById("paymentPageLabel");
+const notificationsBody = document.getElementById("notificationsBody");
+const refreshNotificationsBtn = document.getElementById("refreshNotificationsBtn");
+const customerProfileForm = document.getElementById("customerProfileForm");
+const profileName = document.getElementById("profileName");
+const profilePhone = document.getElementById("profilePhone");
+const profileEmail = document.getElementById("profileEmail");
+const profileLocation = document.getElementById("profileLocation");
+const profilePassword = document.getElementById("profilePassword");
+
+let billHistoryPage = 1;
+let paymentHistoryPage = 1;
+const billHistoryLimit = 12;
+const paymentHistoryLimit = 10;
 
 async function loadPaymentHistory() {
   try {
-    const response = await authFetch(`${API_BASE}/customer/${CUSTOMER_ID}/payments/history?limit=50`);
+    const response = await authFetch(
+      `${API_BASE}/customer/${CUSTOMER_ID}/payments/history?limit=${paymentHistoryLimit}&page=${paymentHistoryPage}`
+    );
     const data = await response.json();
     const payments = data.payments || [];
 
@@ -493,30 +556,178 @@ async function loadPaymentHistory() {
       `;
       paymentHistoryBody.appendChild(tr);
     });
+
+    if (paymentPageLabel) {
+      paymentPageLabel.textContent = `Page ${paymentHistoryPage}`;
+    }
   } catch (error) {
     console.error("Failed to load payment history:", error);
   }
 }
 
+async function loadNotifications() {
+  try {
+    const response = await authFetch(`${API_BASE}/customer/${CUSTOMER_ID}/notifications?limit=50`);
+    const data = await response.json();
+    const notifications = data.notifications || [];
+
+    notificationsBody.innerHTML = "";
+    if (!notifications.length) {
+      notificationsBody.innerHTML = '<tr><td colspan="4" class="no-alerts">No notifications</td></tr>';
+      return;
+    }
+
+    notifications.forEach((notification) => {
+      const statusLabel = notification.read ? "Read" : "New";
+      const statusClass = notification.read ? "text-success" : "text-warning";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${new Date(notification.createdAt).toLocaleString()}</td>
+        <td>${notification.title}</td>
+        <td>${notification.message}</td>
+        <td><span class="${statusClass}">${statusLabel}</span></td>
+      `;
+      notificationsBody.appendChild(tr);
+    });
+  } catch (error) {
+    console.error("Failed to load notifications:", error);
+  }
+}
+
+async function loadProfile() {
+  try {
+    const response = await authFetch(`${API_BASE}/customer/${CUSTOMER_ID}`);
+    const customer = await response.json();
+    profileName.value = customer.name || "";
+    profilePhone.value = customer.phone || "";
+    profileEmail.value = customer.email || "";
+    profileLocation.value = customer.location || "";
+    profilePassword.value = "";
+  } catch (error) {
+    console.error("Failed to load profile:", error);
+  }
+}
+
+customerProfileForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const payload = {
+    name: profileName.value.trim(),
+    phone: profilePhone.value.trim(),
+    email: profileEmail.value.trim(),
+    location: profileLocation.value.trim(),
+  };
+
+  const password = profilePassword.value.trim();
+  if (password) {
+    payload.password = password;
+  }
+
+  try {
+    const response = await authFetch(`${API_BASE}/customer/${CUSTOMER_ID}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      alert(data.message || "Failed to update profile");
+      return;
+    }
+
+    alert("Profile updated");
+    await loadProfile();
+  } catch (error) {
+    console.error("Failed to update profile:", error);
+  }
+});
+
 // =====================================
 // Event Listeners
 // =====================================
 customerComparisonLoadBtn.addEventListener("click", loadCustomerEnergyComparison);
+customerComparisonType.addEventListener("change", loadCustomerEnergyComparison);
 payNowBtn.addEventListener("click", payCurrentBill);
 if (payBtn) {
   payBtn.addEventListener("click", payCurrentBill);
 }
 refreshHistoryBtn.addEventListener("click", loadPaymentHistory);
+refreshNotificationsBtn.addEventListener("click", loadNotifications);
+
+billHistoryBody.addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-dispute-month]");
+  if (!button) {
+    return;
+  }
+
+  const month = button.getAttribute("data-dispute-month");
+  const status = button.getAttribute("data-dispute-status");
+  if (!month || status === "paid") {
+    return;
+  }
+
+  const reason = prompt("Reason for dispute");
+  if (!reason) {
+    return;
+  }
+
+  try {
+    const response = await authFetch(`${API_BASE}/customer/${CUSTOMER_ID}/bills/${month}/dispute`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      alert(data.message || "Failed to raise dispute");
+      return;
+    }
+
+    alert("Dispute submitted successfully");
+  } catch (error) {
+    console.error("Failed to submit dispute:", error);
+  }
+});
+
+billPrevBtn.addEventListener("click", () => {
+  if (billHistoryPage <= 1) {
+    return;
+  }
+  billHistoryPage -= 1;
+  loadBillHistory();
+});
+
+billNextBtn.addEventListener("click", () => {
+  billHistoryPage += 1;
+  loadBillHistory();
+});
+
+paymentPrevBtn.addEventListener("click", () => {
+  if (paymentHistoryPage <= 1) {
+    return;
+  }
+  paymentHistoryPage -= 1;
+  loadPaymentHistory();
+});
+
+paymentNextBtn.addEventListener("click", () => {
+  paymentHistoryPage += 1;
+  loadPaymentHistory();
+});
+
+billMonthSelect?.addEventListener("change", loadCurrentBill);
 
 // =====================================
 // Init
 // =====================================
 (async function init() {
+  initBillMonthSelect();
   await Promise.all([
     fetchCustomerData(),
     loadCustomerEnergyComparison(),
     loadCurrentBill(),
     loadPaymentHistory(),
+    loadNotifications(),
+    loadProfile(),
   ]);
 
   setInterval(fetchCustomerData, 5000);

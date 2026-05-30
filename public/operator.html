@@ -190,6 +190,27 @@
             </table>
           </div>
         </div>
+
+        <div class="table-card" style="margin-top: 1.5rem;">
+          <div class="table-header table-header-row">
+            <span>Customer Disputes</span>
+            <button id="refreshOperatorDisputesBtn" class="ghost-btn">Refresh</button>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Month</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="operatorDisputesBody"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <section id="alertsView" class="dashboard-scroll operator-view hidden">
@@ -199,6 +220,50 @@
             <button id="refreshOperatorAlertsBtn" class="ghost-btn">Refresh</button>
           </div>
           <ul class="alerts-list" id="operatorAlertsModuleList"></ul>
+        </div>
+
+        <div class="table-card" style="margin-top:1.2rem;">
+          <div class="table-header">Create Maintenance Ticket</div>
+          <form id="maintenanceTicketForm" class="stack-form">
+            <label>Grid ID</label>
+            <input id="maintenanceGridId" type="number" min="1" required>
+
+            <label>Title</label>
+            <input id="maintenanceTitle" type="text" required>
+
+            <label>Description</label>
+            <input id="maintenanceDescription" type="text" required>
+
+            <label>Priority</label>
+            <select id="maintenancePriority" class="inline-select">
+              <option value="LOW">Low</option>
+              <option value="MEDIUM" selected>Medium</option>
+              <option value="HIGH">High</option>
+            </select>
+
+            <button type="submit" class="primary-btn">Create Ticket</button>
+          </form>
+        </div>
+
+        <div class="table-card" style="margin-top:1.2rem;">
+          <div class="table-header table-header-row">
+            <span>Maintenance Tickets</span>
+            <button id="refreshMaintenanceTicketsBtn" class="ghost-btn">Refresh</button>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Grid</th>
+                  <th>Title</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="operatorMaintenanceBody"></tbody>
+            </table>
+          </div>
         </div>
 
         <div class="table-card" style="margin-top:1.2rem;">
@@ -224,6 +289,36 @@
       </section>
 
     </main>
+  </div>
+
+  <div id="customerEditModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span>Edit Customer</span>
+        <button class="ghost-btn" id="closeCustomerModal">Close</button>
+      </div>
+      <form id="customerEditForm" class="stack-form">
+        <label>Name</label>
+        <input id="editCustomerName" type="text" required>
+
+        <label>Phone</label>
+        <input id="editCustomerPhone" type="text" required>
+
+        <label>Email</label>
+        <input id="editCustomerEmail" type="text">
+
+        <label>Location</label>
+        <input id="editCustomerLocation" type="text" required>
+
+        <label>New Password (leave blank to keep)</label>
+        <input id="editCustomerPassword" type="text">
+
+        <div class="modal-actions">
+          <button type="button" class="secondary-btn" id="cancelCustomerEdit">Cancel</button>
+          <button type="submit" class="primary-btn">Save Changes</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

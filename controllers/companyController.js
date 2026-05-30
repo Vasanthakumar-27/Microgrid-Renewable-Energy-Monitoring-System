@@ -15,10 +15,14 @@ const {
   getBillHistory,
 } = require("../data/billingStore");
 const TariffRate = require("../models/tariffRateModel");
+const config = require("../config/appConfig");
+const { logAudit, listAuditLogs } = require("../data/auditLogStore");
 
 const roundToTwo = (value) => Number(value.toFixed(2));
 const monthPattern = /^\d{4}-(0[1-9]|1[0-2])$/;
 const CURRENCY = "INR";
+const TARIFF_MIN = config.tariffMin;
+const TARIFF_MAX = config.tariffMax;
 
 function toMonthKey(year, month) {
   const normalizedYear = Number(year);
@@ -102,6 +106,15 @@ const createOperator = async (req, res) => {
       location,
     });
 
+    await logAudit({
+      actorRole: req.user?.role || "admin",
+      actorId: req.user?.sub || "admin",
+      action: "OPERATOR_CREATED",
+      targetType: "operator",
+      targetId: operator.id,
+      metadata: { gridCount: operator.gridCount },
+    });
+
     return res.status(201).json({
       message: "Operator added successfully",
       operator,
@@ -119,6 +132,14 @@ const deleteOperator = async (req, res) => {
     return res.status(404).json({ message: "Operator not found" });
   }
 
+  await logAudit({
+    actorRole: req.user?.role || "admin",
+    actorId: req.user?.sub || "admin",
+    action: "OPERATOR_DELETED",
+    targetType: "operator",
+    targetId: id,
+  });
+
   return res.status(200).json({
     message: "Operator removed",
     operator: deleted,
@@ -132,6 +153,14 @@ const updateOperator = async (req, res) => {
   if (!operator) {
     return res.status(404).json({ message: "Operator not found" });
   }
+
+  await logAudit({
+    actorRole: req.user?.role || "admin",
+    actorId: req.user?.sub || "admin",
+    action: "OPERATOR_UPDATED",
+    targetType: "operator",
+    targetId: id,
+  });
 
   return res.status(200).json({
     message: "Operator updated",
@@ -268,8 +297,10 @@ const getTariffRate = async (req, res) => {
 
 const setTariffRate = async (req, res) => {
   const rate = Number(req.body?.rate);
-  if (!Number.isFinite(rate) || rate <= 0) {
-    return res.status(400).json({ message: "rate must be a positive number" });
+  if (!Number.isFinite(rate) || rate < TARIFF_MIN || rate > TARIFF_MAX) {
+    return res.status(400).json({
+      message: `rate must be between ${TARIFF_MIN} and ${TARIFF_MAX}`,
+    });
   }
 
   try {
@@ -287,6 +318,15 @@ const setTariffRate = async (req, res) => {
       effectiveDate: new Date(),
       changedBy: req.user?.sub || "admin",
       description: "Tariff rate update",
+    });
+
+    await logAudit({
+      actorRole: req.user?.role || "admin",
+      actorId: req.user?.sub || "admin",
+      action: "TARIFF_UPDATED",
+      targetType: "tariff",
+      targetId: String(saved._id),
+      metadata: { rate: saved.rate, currency: saved.currency },
     });
 
     return res.status(200).json({
@@ -348,6 +388,18 @@ const getBillingSummary = async (req, res) => {
   });
 };
 
+const getAuditLogHistory = async (req, res) => {
+  const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 100));
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const rows = await listAuditLogs({ limit, page });
+
+  return res.status(200).json({
+    page,
+    limit,
+    rows,
+  });
+};
+
 module.exports = {
   getCompanyDashboard,
   listOperators,
@@ -363,4 +415,5 @@ module.exports = {
   setTariffRate,
   getTariffRateHistory,
   getBillingSummary,
+  getAuditLogHistory,
 };
